@@ -1,0 +1,12 @@
+
+
+required gem
+- xmlrpcs >= 0.1
+
+requires ruby UPNP library
+check here for more info:
+http://almostworkingcode.wordpress.com/2008/06/08/upnp-ruby-integration/
+http://almostworkingcode.wordpress.com/2008/06/17/upnp-ruby-wrapper/
+
+
+Author: Dario Meloni <mellon85@gmail.com>
