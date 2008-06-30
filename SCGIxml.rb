@@ -21,7 +21,12 @@ class SCGIWrappedSocket
     end
 
     def write(x)
-        @sock.write(SCGI::Wrapper.wrap(x,@uri,@method))
+        msg = SCGI::Wrapper.wrap(x,@uri,@method)
+        r = @sock.write(msg)
+        if r != msg.length then
+            raise IOException, "Not all the data has been sent (#{r}/#{msg.length})"
+        end 
+        return x.length
     end 
 
     def read()

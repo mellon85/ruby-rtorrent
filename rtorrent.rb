@@ -89,7 +89,7 @@ while true do
     sleep(2)
 
     # query rtorrent for data
-    rtorrent_max_up, rtorrent_max_down, list = rtorrent.multicall(["get_download_rate"],["get_upload_rate"],["download_list"]) 
+    rtorrent_max_up, rtorrent_max_down, list = rtorrent.multicall([["get_download_rate"],["get_upload_rate"],["download_list"]]) 
 
     # get kB
     rtorrent_max_down /= RTORRENT_CONVERSION
