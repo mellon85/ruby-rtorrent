@@ -2,7 +2,7 @@
 # Author: Dario Meloni <mellon85@gmail.com>
 
 require 'xmlrpc/client'
-require 'xmlrpcs'
+require 'xmlrpc/xmlrpcs'
 require 'socket'
 require 'scgi'
 

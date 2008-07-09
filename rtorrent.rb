@@ -1,22 +1,28 @@
-require 'UPNP'
+require 'rubygems'
+require 'UPnP'
 require 'thread'
 require 'SCGIxml'
 
-TRUST_ROUTER_LINK_SPEED = false
+TRUST_ROUTER_LINK_SPEED = true
 
-MAX_UP = 0
-MIN_UP = 5
+MAX_UP                  = 0
+MIN_UP                  = 5
 
-MAX_DOWN = 0
-MIN_DOWN = 50
+MAX_DOWN                = 0
+MIN_DOWN                = 50
 
-MAX_CHANGE = 5
-NUM_OF_PROBE = 5
-INTERVAL = 1
+MAX_CHANGE              = 5
+NUM_OF_PROBE            = 5
+INTERVAL                = 1
 
-NETWORK_CONFIDENCY = 0.8
-UPNP_CONVERSION = 1024*8
-RTORRENT_CONVERSION = 1024
+NETWORK_CONFIDENCY      = 0.8
+UPNP_CONVERSION         = 1024*8
+RTORRENT_CONVERSION     = 1024
+
+CRIT_UP                 = 5
+CRIT_DOWN               = 30
+
+RTORRENT_INTERVAL       = 2
 
 def get_average(v)
     a=0
@@ -27,14 +33,14 @@ def get_average(v)
 end
 
 
-class UPNPDaemon
+class UPnPDaemon
 
     def initialize()
         @upload = [0]*NUM_OF_PROBE
         @download = [0]*NUM_OF_PROBE
         @semaphore = Mutex.new
 
-        @upnp = MiniUPNP::UPNP.new
+        @upnp = UPnP::UPnP.new
         @daemon = Thread.new do 
             while true do
               sent = @upnp.getTotalBytesSent().to_i
@@ -73,7 +79,7 @@ class UPNPDaemon
     private
 end
 
-$d = UPNPDaemon.new
+$d = UPnPDaemon.new
 
 if TRUST_ROUTER_LINK_SPEED == true
     link_down, link_up = $d.linkBitrate()
@@ -86,10 +92,10 @@ rtorrent_up_a = [0]*NUM_OF_PROBE
 rtorrent_down_a = [0]*NUM_OF_PROBE
 
 while true do
-    sleep(2)
+    sleep(RTORRENT_INTERVAL)
 
     # query rtorrent for data
-    rtorrent_max_up, rtorrent_max_down, list = rtorrent.multicall([["get_download_rate"],["get_upload_rate"],["download_list"]]) 
+    rtorrent_max_up, rtorrent_max_down, list = rtorrent.multicall(["get_download_rate"],["get_upload_rate"],["download_list"]) 
 
     # get kB
     rtorrent_max_down /= RTORRENT_CONVERSION
@@ -123,7 +129,6 @@ while true do
     other_up = router_up - rtorrent_up
     other_down = router_down - rtorrent_down
 
-    #puts "#{router_up},#{router_down}"
     ### ALGORITHM
     # VARIABLES:
     # router_up, router_down (avg over 5s)
@@ -132,20 +137,36 @@ while true do
     # other_up, other_down (avg over 5s)
     # store result in rtorrent_new_down, rtorrent_new_up
     
-    # no changes for now
-    rtorrent_new_down = rtorrent_max_down
-    rtorrent_new_up   = rtorrent_max_up
+    rtorrent_new_down = router_down - other_down - CRIT_DOWN
+    rtorrent_new_up   = router_up   - other_up   - CRIT_UP
 
     
     ### END
+    diff = rtorrent_new_down - rtorrent_down
+    if diff.abs > MAX_CHANGE
+        if diff > 0 then
+            rtorrent_new_down = rtorrent_down+MAX_CHANGE
+        else
+            rtorrent_new_down = rtorrent_down-MAX_CHANGE
+        end
+    end
+    diff = rtorrent_new_up - rtorrent_up
+    if diff.abs > MAX_CHANGE
+        if diff > 0 then
+            rtorrent_new_up = rtorrent_up+MAX_CHANGE
+        else
+            rtorrent_new_up = rtorrent_up-MAX_CHANGE
+        end
+    end
+
     if rtorrent_new_down < MIN_DOWN and MIN_DOWN != 0
         rtorrent_new_down = MIN_DOWN
-    else if rtorrent_new_down > MAX_DOWN and MAX_DOWN != 0
+    elsif rtorrent_new_down > MAX_DOWN and MAX_DOWN != 0
         rtorrent_new_down = MAX_DOWN
     end
     if rtorrent_new_up < MIN_UP and MIN_UP != 0
         rtorrent_new_up = MIN_UP
-    else if rtorrent_new_up > MAX_UP and MAX_UP != 0
+    elsif rtorrent_new_up > MAX_UP and MAX_UP != 0
         rtorrent_new_up = MAX_UP
     end
    
