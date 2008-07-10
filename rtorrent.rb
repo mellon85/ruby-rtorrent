@@ -5,10 +5,7 @@ require 'SCGIxml'
 
 TRUST_ROUTER_LINK_SPEED = true
 
-MAX_UP                  = 0
 MIN_UP                  = 5
-
-MAX_DOWN                = 0
 MIN_DOWN                = 50
 
 MAX_CHANGE              = 5
@@ -43,8 +40,8 @@ class UPnPDaemon
         @upnp = UPnP::UPnP.new
         @daemon = Thread.new do 
             while true do
-              sent = @upnp.getTotalBytesSent().to_i
-              recv = @upnp.getTotalBytesReceived().to_i
+              sent = @upnp.totalBytesSent().to_i
+              recv = @upnp.totalBytesReceived().to_i
               @semaphore.synchronize {
                 @upload = @upload[1,NUM_OF_PROBE]+[sent]
                 @download = @download[1,NUM_OF_PROBE]+[recv]
@@ -73,7 +70,7 @@ class UPnPDaemon
     end
 
     def linkBitrate()
-        @upnp.getMaxLinkBitrates()
+        @upnp.maxLinkBitrates()
     end
 
     private
@@ -85,6 +82,9 @@ if TRUST_ROUTER_LINK_SPEED == true
     link_down, link_up = $d.linkBitrate()
     MAX_UP = (link_up.to_i/UPNP_CONVERSION)*NETWORK_CONFIDENCY
     MAX_DOWN = (link_down.to_i/UPNP_CONVERSION)*NETWORK_CONFIDENCY
+else
+    MAX_UP                  = 35
+    MAX_DOWN                = 250
 end
 
 rtorrent = SCGIXMLClient.new(["/tmp/rtorrent.sock","/RPC2"])
