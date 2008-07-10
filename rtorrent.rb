@@ -5,24 +5,24 @@ require 'SCGIxml'
 
 TRUST_ROUTER_LINK_SPEED = true
 
-LINE_UP_MAX = 25
-LINE_DOWN_MAX = 250
+LINE_UP_MAX         = 25
+LINE_DOWN_MAX       = 250
 
-MIN_UP                  = 5
-MIN_DOWN                = 10
+MIN_UP              = 5
+MIN_DOWN            = 10
 
-MAX_CHANGE              = 5
-NUM_OF_PROBE            = 5
-INTERVAL                = 1
+MAX_CHANGE          = 5
+NUM_OF_PROBE        = 5
+INTERVAL            = 1
 
-NETWORK_CONFIDENCY      = 0.8
-UPNP_CONVERSION         = 1024*8
-RTORRENT_CONVERSION     = 1024
+NETWORK_CONFIDENCY  = 0.8
+UPNP_CONVERSION     = 1024*8
+RTORRENT_CONVERSION = 1024
 
-CRIT_UP                 = 5
-CRIT_DOWN               = 30
+CRIT_UP             = 5
+CRIT_DOWN           = 30
 
-RTORRENT_INTERVAL       = 2
+RTORRENT_INTERVAL   = 2
 
 def get_average(v)
     a=0
@@ -172,7 +172,7 @@ while true do
         rtorrent_new_up = MAX_UP
     end
     puts "#{rtorrent_new_down} = #{router_down} - #{other_down} - #{CRIT_DOWN}"
-    puts "#{rtorrent_new_put} = #{router_put} - #{other_put} - #{CRIT_put}"
+    puts "#{rtorrent_new_put}  = #{router_put}  - #{other_put}  - #{CRIT_PUT}"
    
     # if needed apply the changes
     request = []
