@@ -5,8 +5,11 @@ require 'SCGIxml'
 
 TRUST_ROUTER_LINK_SPEED = true
 
+LINE_UP_MAX = 25
+LINE_DOWN_MAX = 250
+
 MIN_UP                  = 5
-MIN_DOWN                = 50
+MIN_DOWN                = 10
 
 MAX_CHANGE              = 5
 NUM_OF_PROBE            = 5
@@ -23,10 +26,10 @@ RTORRENT_INTERVAL       = 2
 
 def get_average(v)
     a=0
-    for i in 0..(NUM_OF_PROBE-2)
+    for i in 0..(v.length-2)
         a = a + v[i+1]-v[i]
     end
-    return a/(NUM_OF_PROBE-1)
+    return a/(v.length-1)
 end
 
 
@@ -83,8 +86,8 @@ if TRUST_ROUTER_LINK_SPEED == true
     MAX_UP = (link_up.to_i/UPNP_CONVERSION)*NETWORK_CONFIDENCY
     MAX_DOWN = (link_down.to_i/UPNP_CONVERSION)*NETWORK_CONFIDENCY
 else
-    MAX_UP                  = 35
-    MAX_DOWN                = 250
+    MAX_UP                  = LINE_UP_MAX
+    MAX_DOWN                = LINE_DOWN_MAX
 end
 
 rtorrent = SCGIXMLClient.new(["/tmp/rtorrent.sock","/RPC2"])
@@ -112,11 +115,11 @@ while true do
     rtorrent_up = 0
     rtorrent_down = 0
     for i in (0..list.length)
-        rtorrent_up += data[i*2].to_i
+        rtorrent_up   += data[i*2].to_i
         rtorrent_down += data[i*2+1].to_i
     end
-    rtorrent_up_a = rtorrent_up_a[1,NUM_OF_PROBE]+[rtorrent_current_up]
-    rtorrent_down_a =  rtorrent_down_a[1,NUM_OF_PROBE]+[rtorrent_current_down]
+    rtorrent_up_a = rtorrent_up_a[1,NUM_OF_PROBE]+[rtorrent_up]
+    rtorrent_down_a =  rtorrent_down_a[1,NUM_OF_PROBE]+[rtorrent_down]
     rtorrent_up = get_average(rtorrent_up_a)     / RTORRENT_CONVERSION
     rtorrent_down = get_average(rtorrent_down_a) / RTORRENT_CONVERSION
 
@@ -139,7 +142,6 @@ while true do
     
     rtorrent_new_down = router_down - other_down - CRIT_DOWN
     rtorrent_new_up   = router_up   - other_up   - CRIT_UP
-
     
     ### END
     diff = rtorrent_new_down - rtorrent_down
@@ -169,6 +171,8 @@ while true do
     elsif rtorrent_new_up > MAX_UP and MAX_UP != 0
         rtorrent_new_up = MAX_UP
     end
+    puts "#{rtorrent_new_down} = #{router_down} - #{other_down} - #{CRIT_DOWN}"
+    puts "#{rtorrent_new_put} = #{router_put} - #{other_put} - #{CRIT_put}"
    
     # if needed apply the changes
     request = []
