@@ -14,10 +14,10 @@ end
 
 class SCGIWrappedSocket
 
+    attr_accessor :sock, :uri, :method
+
     def initialize( sock, uri, method="POST" )
-        @sock = sock
-        @uri = uri
-        @method = method
+        @sock, @uri, @method = sock, uri, method
     end
 
     def write(x)
