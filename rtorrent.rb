@@ -83,11 +83,11 @@ $d = UPnPDaemon.new
 
 if TRUST_ROUTER_LINK_SPEED == true
     link_down, link_up = $d.linkBitrate()
-    MAX_UP = (link_up.to_i/UPNP_CONVERSION)*NETWORK_CONFIDENCY
+    MAX_UP   = (link_up.to_i/UPNP_CONVERSION)*NETWORK_CONFIDENCY
     MAX_DOWN = (link_down.to_i/UPNP_CONVERSION)*NETWORK_CONFIDENCY
-else
-    MAX_UP                  = LINE_UP_MAX
-    MAX_DOWN                = LINE_DOWN_MAX
+    else
+    MAX_UP   = LINE_UP_MAX
+    MAX_DOWN = LINE_DOWN_MAX
 end
 
 rtorrent = SCGIXMLClient.new(["/tmp/rtorrent.sock","/RPC2"])
@@ -172,7 +172,7 @@ while true do
         rtorrent_new_up = MAX_UP
     end
     puts "#{rtorrent_new_down} = #{router_down} - #{other_down} - #{CRIT_DOWN}"
-    puts "#{rtorrent_new_put}  = #{router_put}  - #{other_put}  - #{CRIT_PUT}"
+    puts "#{rtorrent_new_up}   = #{router_up}   - #{other_up}   - #{CRIT_UP}"
    
     # if needed apply the changes
     request = []
