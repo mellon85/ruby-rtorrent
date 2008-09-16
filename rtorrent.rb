@@ -4,25 +4,26 @@ require 'thread'
 require 'SCGIxml'
 
 TRUST_ROUTER_LINK_SPEED = true
+RTORRENT_SOCK = "/home/dario/.rtorrent/sock"
 
-LINE_UP_MAX         = 25
+LINE_UP_MAX         = 30
 LINE_DOWN_MAX       = 250
 
 MIN_UP              = 5
 MIN_DOWN            = 10
 
-MAX_CHANGE          = 5
-NUM_OF_PROBE        = 5
+MAX_CHANGE          = 3
 INTERVAL            = 1
+PROBE_INTERVAL      = 5
+RTORRENT_INTERVAL   = 2
 
-NETWORK_CONFIDENCY  = 0.8
+ROUTER_CONVERSION   = 0.8
 UPNP_CONVERSION     = 1024*8
 RTORRENT_CONVERSION = 1024
 
 CRIT_UP             = 5
 CRIT_DOWN           = 30
 
-RTORRENT_INTERVAL   = 2
 
 def get_average(v)
     a=0
@@ -36,8 +37,8 @@ end
 class UPnPDaemon
 
     def initialize()
-        @upload = [0]*NUM_OF_PROBE
-        @download = [0]*NUM_OF_PROBE
+        @upload    = [0]*PROBE_INTERVAL
+        @download  = [0]*PROBE_INTERVAL
         @semaphore = Mutex.new
 
         @upnp = UPnP::UPnP.new
@@ -46,8 +47,8 @@ class UPnPDaemon
               sent = @upnp.totalBytesSent().to_i
               recv = @upnp.totalBytesReceived().to_i
               @semaphore.synchronize {
-                @upload = @upload[1,NUM_OF_PROBE]+[sent]
-                @download = @download[1,NUM_OF_PROBE]+[recv]
+                @upload = @upload[1,PROBE_INTERVAL]+[sent]
+                @download = @download[1,PROBE_INTERVAL]+[recv]
               }
              sleep(1)
             end
@@ -57,18 +58,14 @@ class UPnPDaemon
     # values are in kbit/INTERVAL
     def get_upload()
         up = 0
-        @semaphore.synchronize {
-            up = get_average(@upload)
-        }
+        @semaphore.synchronize { up = get_average(@upload) }
         return up
     end
 
     # values are in kbit/INTERVAL
     def get_download()
         down = 0
-        @semaphore.synchronize {
-            down = get_average(@download)
-        }
+        @semaphore.synchronize { down = get_average(@download) }
         return down
     end
 
@@ -83,16 +80,16 @@ $d = UPnPDaemon.new
 
 if TRUST_ROUTER_LINK_SPEED == true
     link_down, link_up = $d.linkBitrate()
-    MAX_UP   = (link_up.to_i/UPNP_CONVERSION)*NETWORK_CONFIDENCY
-    MAX_DOWN = (link_down.to_i/UPNP_CONVERSION)*NETWORK_CONFIDENCY
-    else
+    MAX_UP   = link_up.to_i   * ROUTER_CONVERSION / UPNP_CONVERSION
+    MAX_DOWN = link_down.to_i * ROUTER_CONVERSION / UPNP_CONVERSION
+else
     MAX_UP   = LINE_UP_MAX
     MAX_DOWN = LINE_DOWN_MAX
 end
 
-rtorrent = SCGIXMLClient.new(["/tmp/rtorrent.sock","/RPC2"])
-rtorrent_up_a = [0]*NUM_OF_PROBE
-rtorrent_down_a = [0]*NUM_OF_PROBE
+rtorrent        = SCGIXMLClient.new([RTORRENT_SOCKET,"/RPC2"])
+rtorrent_up_a   = [0]*PROBE_INTERVAL
+rtorrent_down_a = [0]*PROBE_INTERVAL
 
 while true do
     sleep(RTORRENT_INTERVAL)
@@ -118,10 +115,10 @@ while true do
         rtorrent_up   += data[i*2].to_i
         rtorrent_down += data[i*2+1].to_i
     end
-    rtorrent_up_a = rtorrent_up_a[1,NUM_OF_PROBE]+[rtorrent_up]
-    rtorrent_down_a =  rtorrent_down_a[1,NUM_OF_PROBE]+[rtorrent_down]
-    rtorrent_up = get_average(rtorrent_up_a)     / RTORRENT_CONVERSION
-    rtorrent_down = get_average(rtorrent_down_a) / RTORRENT_CONVERSION
+    rtorrent_up_a   = rtorrent_up_a[1,PROBE_INTERVAL]   + [rtorrent_up]
+    rtorrent_down_a = rtorrent_down_a[1,PROBE_INTERVAL] + [rtorrent_down]
+    rtorrent_up     = get_average(rtorrent_up_a)   / RTORRENT_CONVERSION
+    rtorrent_down   = get_average(rtorrent_down_a) / RTORRENT_CONVERSION
 
 
     # get info from the router about used bandwidth
@@ -161,6 +158,7 @@ while true do
         end
     end
 
+    # apply the limits
     if rtorrent_new_down < MIN_DOWN and MIN_DOWN != 0
         rtorrent_new_down = MIN_DOWN
     elsif rtorrent_new_down > MAX_DOWN and MAX_DOWN != 0
