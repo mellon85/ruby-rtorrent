@@ -139,8 +139,8 @@ while true do
     debug "router #{$d.get_upload},#{$d.get_download}"
     debug "rtorrent #{get_average(rtorrent_up_a)},#{get_average(rtorrent_down_a)}"
     # get info from the router about used bandwidth
-    router_up   = $d.get_upload   / UPNP_CONVERSION
-    router_down = $d.get_download / UPNP_CONVERSION
+    router_up   = $d.get_upload   / 1024 # / UPNP_CONVERSION
+    router_down = $d.get_download / 1024 # / UPNP_CONVERSION
     debug "Router up: #{router_up}"
     debug "Router down: #{router_down}"
     
