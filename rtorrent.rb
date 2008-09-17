@@ -135,15 +135,15 @@ while true do
     rtorrent_up     = get_average(rtorrent_up_a)   / RTORRENT_CONVERSION
     rtorrent_down   = get_average(rtorrent_down_a) / RTORRENT_CONVERSION
 
-
-    debug "router #{$d.get_upload},#{$d.get_download}"
     debug "rtorrent #{get_average(rtorrent_up_a)},#{get_average(rtorrent_down_a)}"
     # get info from the router about used bandwidth
     router_up   = $d.get_upload   / 1024 # / UPNP_CONVERSION
     router_down = $d.get_download / 1024 # / UPNP_CONVERSION
     debug "Router up: #{router_up}"
     debug "Router down: #{router_down}"
-    
+    debug "Rtorrent up: #{rtorrent_up}"
+    debug "Rtorrent down: #{rtorrent_down}"
+
     # get bandwidth of other programs
     other_up = router_up - rtorrent_up
     other_down = router_down - rtorrent_down
