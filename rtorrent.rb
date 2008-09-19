@@ -12,7 +12,7 @@ require 'pp'
 TRUST_ROUTER_LINK_SPEED = true
 RTORRENT_SOCKET = "/home/dario/.rtorrent/socket"
 
-LINE_UP_MAX         = 30
+LINE_UP_MAX         = 25
 LINE_DOWN_MAX       = 250
 
 MIN_UP              = 5
@@ -108,18 +108,18 @@ while true do
     sleep(RTORRENT_INTERVAL)
 
     # query rtorrent for data
-    rtorrent_max_up, rtorrent_max_down, list = rtorrent.multicall(["get_download_rate"],["get_upload_rate"],["download_list"]) 
+    rtorrent_max_down, rtorrent_max_up, list = rtorrent.multicall(["get_download_rate"],["get_upload_rate"],["download_list"]) 
 
     # get kB
     rtorrent_max_down /= RTORRENT_CONVERSION
     rtorrent_max_up   /= RTORRENT_CONVERSION
     
     # get info from the router about used bandwidth
-    router_up   = $d.get_upload   / UPNP_CONVERSION
-    router_down = $d.get_download / UPNP_CONVERSION
+    router_up   = $d.get_upload   / 1024
+    router_down = $d.get_download / 1024
 
-    puts "Router up: #{router_up}"
-    puts "Router down: #{router_down}"
+    debug "Router up: #{router_up}"
+    debug "Router down: #{router_down}"
 
     ### ALGORITHM
     # VARIABLES:
@@ -129,8 +129,11 @@ while true do
     # other_up, other_down (avg over 5s)
     # store result in rtorrent_new_down, rtorrent_new_up
     
-    rtorrent_new_up   = (MAX_UP   - router_up   + (rtorrent_max_up / RTORRENT_COEFFICENT) - CRIT_UP  )*RTORRENT_COEFFICENT
-    rtorrent_new_down = (MAX_DOWN - router_down + (rtorrent_max_down / RTORRENT_COEFFICENT) - CRIT_DOWN)*RTORRENT_COEFFICENT 
+    rtorrent_new_up   = MAX_UP   - router_up   + rtorrent_max_up   - CRIT_UP
+    rtorrent_new_down = MAX_DOWN - router_down + rtorrent_max_down - CRIT_DOWN
+
+    debug "#{rtorrent_new_up} = #{MAX_UP} - #{router_up} + #{rtorrent_max_up} - #{CRIT_UP}"
+    debug "#{rtorrent_new_down} = #{MAX_DOWN} - #{router_down} + #{rtorrent_max_down} - #{CRIT_DOWN}"
 
     rtorrent_new_up   = rtorrent_new_up.to_i
     rtorrent_new_down = rtorrent_new_down.to_i
@@ -147,11 +150,11 @@ while true do
         rtorrent_new_up = MAX_UP
     end
 
-    # keep upload low enough to allow downloads
-    download_ratio = router_download*DOWNLOAD_UPLOAD_RATIO
-    if router_new_up > download_ratio then
-        router_new_up = download_ratio
-    end
+#    # keep upload low enough to allow downloads
+#    download_ratio = router_down*DOWNLOAD_UPLOAD_RATIO
+#    if rtorrent_new_up > download_ratio then
+#        rtorrent_new_up = download_ratio
+#    end
 
     #@TODO should use multicall but i am experiencing problems
     # if needed apply the changes
