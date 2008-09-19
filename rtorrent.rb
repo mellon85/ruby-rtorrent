@@ -19,16 +19,17 @@ MIN_UP              = 5
 MIN_DOWN            = 10
 
 MAX_CHANGE_UP       = 5
-MAX_CHANGE_DOWN     = 50
+MAX_CHANGE_DOWN     = 10
 INTERVAL            = 1
 PROBE_INTERVAL      = 5
 RTORRENT_INTERVAL   = 2
 
-ROUTER_CORRECTION   = 0.9
 UPNP_CONVERSION     = 1024*8
 RTORRENT_CONVERSION = 1024
+RTORRENT_COEFFICENT = 0.9
+DOWNLOAD_UPLOAD_RATIO = 1 # need testing to find a 'correct' value
 
-CRIT_UP             = 5
+CRIT_UP             = 10
 CRIT_DOWN           = 30
 
 DEBUG = 1
@@ -91,13 +92,14 @@ $d = UPnPDaemon.new
 
 if TRUST_ROUTER_LINK_SPEED == true
     link_down, link_up = $d.linkBitrate()
-    MAX_UP   = (link_up.to_i   * ROUTER_CORRECTION) / UPNP_CONVERSION
-    MAX_DOWN = (link_down.to_i * ROUTER_CORRECTION) / UPNP_CONVERSION
+    MAX_UP   = link_up.to_i   / UPNP_CONVERSION
+    MAX_DOWN = link_down.to_i / UPNP_CONVERSION
 else
     MAX_UP   = LINE_UP_MAX
     MAX_DOWN = LINE_DOWN_MAX
 end
 debug "MAX_UP = #{MAX_UP}"
+debug "MAX_DOWN = #{MAX_DOWN}"
 rtorrent        = SCGIXMLClient.new([RTORRENT_SOCKET,"/RPC2"])
 rtorrent_up_a   = [0]*PROBE_INTERVAL
 rtorrent_down_a = [0]*PROBE_INTERVAL
@@ -112,41 +114,12 @@ while true do
     rtorrent_max_down /= RTORRENT_CONVERSION
     rtorrent_max_up   /= RTORRENT_CONVERSION
     
-    #@TODO should use multicall but i am experiencing problems
-    # get total rates data
-    #request = []
-    data = []
-    list.each do |d|
-        data.push(rtorrent.call("d.get_up_rate",d))
-        data.push(rtorrent.call("d.get_down_rate",d))
-        #request += ["d.get_up_rate",d] + ["d.get_down_rate",d] 
-    end
-    #data = rtorrent.multicall(request)
-    
-    # calculate total rates
-    rtorrent_up = 0
-    rtorrent_down = 0
-    for i in (0..list.length)
-        rtorrent_up   += data[i*2].to_i
-        rtorrent_down += data[i*2+1].to_i
-    end
-    rtorrent_up_a   = rtorrent_up_a[1,PROBE_INTERVAL]   + [rtorrent_up]
-    rtorrent_down_a = rtorrent_down_a[1,PROBE_INTERVAL] + [rtorrent_down]
-    rtorrent_up     = get_average(rtorrent_up_a)   / RTORRENT_CONVERSION
-    rtorrent_down   = get_average(rtorrent_down_a) / RTORRENT_CONVERSION
-
-    debug "rtorrent #{get_average(rtorrent_up_a)},#{get_average(rtorrent_down_a)}"
     # get info from the router about used bandwidth
-    router_up   = $d.get_upload   / 1024 # / UPNP_CONVERSION
-    router_down = $d.get_download / 1024 # / UPNP_CONVERSION
-    debug "Router up: #{router_up}"
-    debug "Router down: #{router_down}"
-    debug "Rtorrent up: #{rtorrent_up}"
-    debug "Rtorrent down: #{rtorrent_down}"
+    router_up   = $d.get_upload   / UPNP_CONVERSION
+    router_down = $d.get_download / UPNP_CONVERSION
 
-    # get bandwidth of other programs
-    other_up = router_up - rtorrent_up
-    other_down = router_down - rtorrent_down
+    puts "Router up: #{router_up}"
+    puts "Router down: #{router_down}"
 
     ### ALGORITHM
     # VARIABLES:
@@ -156,29 +129,11 @@ while true do
     # other_up, other_down (avg over 5s)
     # store result in rtorrent_new_down, rtorrent_new_up
     
-    rtorrent_new_down = MAX_DOWN - other_down - CRIT_DOWN
-    rtorrent_new_up   = MAX_UP   - other_up   - CRIT_UP
-    debug "#{rtorrent_new_down} = #{MAX_DOWN} - #{other_down} - #{CRIT_DOWN}"
-    debug "#{rtorrent_new_up}   = #{MAX_UP}   - #{other_up}   - #{CRIT_UP}"
-   
-    ### END
-    #@TODO Malfunctioning code
-    #diff = rtorrent_new_down - rtorrent_down
-    #if diff.abs > MAX_CHANGE_DOWN
-    #    if diff > 0 then
-    #        rtorrent_new_down = rtorrent_down + MAX_CHANGE_DOWN
-    #    else
-    #        rtorrent_new_down = rtorrent_down - MAX_CHANGE_DOWN
-    #    end
-    #end
-    #diff = rtorrent_new_up - rtorrent_up
-    #if diff.abs > MAX_CHANGE_UP
-    #    if diff > 0 then
-    #        rtorrent_new_up = rtorrent_up + MAX_CHANGE_UP
-    #    else
-    #        rtorrent_new_up = rtorrent_up - MAX_CHANGE_UP
-    #    end
-    #end
+    rtorrent_new_up   = (MAX_UP   - router_up   + (rtorrent_max_up / RTORRENT_COEFFICENT) - CRIT_UP  )*RTORRENT_COEFFICENT
+    rtorrent_new_down = (MAX_DOWN - router_down + (rtorrent_max_down / RTORRENT_COEFFICENT) - CRIT_DOWN)*RTORRENT_COEFFICENT 
+
+    rtorrent_new_up   = rtorrent_new_up.to_i
+    rtorrent_new_down = rtorrent_new_down.to_i
 
     # apply the limits
     if rtorrent_new_down < MIN_DOWN and MIN_DOWN != 0
@@ -192,8 +147,11 @@ while true do
         rtorrent_new_up = MAX_UP
     end
 
-    rtorrent_new_up = rtorrent_new_up.to_i
-    rtorrent_new_down = rtorrent_new_down.to_i
+    # keep upload low enough to allow downloads
+    download_ratio = router_download*DOWNLOAD_UPLOAD_RATIO
+    if router_new_up > download_ratio then
+        router_new_up = download_ratio
+    end
 
     #@TODO should use multicall but i am experiencing problems
     # if needed apply the changes
