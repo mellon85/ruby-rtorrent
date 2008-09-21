@@ -109,7 +109,13 @@ while true do
     sleep(RTORRENT_INTERVAL)
 
     # query rtorrent for data
+    begin
     rtorrent_max_down, rtorrent_max_up, list = rtorrent.multicall(["get_download_rate"],["get_upload_rate"],["download_list"]) 
+    rescue Exception => e
+        puts "Error while retriving data from rtorrent"
+        pp e
+        exit 1
+    end
 
     # get kB
     rtorrent_max_down /= RTORRENT_CONVERSION
@@ -181,18 +187,24 @@ while true do
     #@TODO should use multicall but i am experiencing problems
     # if needed apply the changes
     #request = []
-    if rtorrent_new_down != rtorrent_max_down
-        #request += ["set_download_rate","#{rtorrent_new_down*RTORRENT_CONVERSION}"]
-        debug "fixing download to: #{rtorrent_new_down}"
-        rtorrent.call("set_download_rate","#{rtorrent_new_down*RTORRENT_CONVERSION}")
+    begin
+        if rtorrent_new_down != rtorrent_max_down
+            #request += ["set_download_rate","#{rtorrent_new_down*RTORRENT_CONVERSION}"]
+            debug "fixing download to: #{rtorrent_new_down}"
+            rtorrent.call("set_download_rate","#{rtorrent_new_down*RTORRENT_CONVERSION}")
+        end
+        if rtorrent_new_up != rtorrent_max_up
+            #request += ["set_upload_rate","#{rtorrent_new_up*RTORRENT_CONVERSION}"]
+            debug "fixing upload to: #{rtorrent_new_up}"
+            rtorrent.call("set_upload_rate","#{rtorrent_new_up*RTORRENT_CONVERSION}")
+        end
+        #if request.length > 0 then
+        #    rtorrent.multicall(request)
+        #end
+    rescue Exception => e
+        puts "Error while sending new limits to rtorrent"
+        pp e
+        exit 2
     end
-    if rtorrent_new_up != rtorrent_max_up
-        #request += ["set_upload_rate","#{rtorrent_new_up*RTORRENT_CONVERSION}"]
-        debug "fixing upload to: #{rtorrent_new_up}"
-        rtorrent.call("set_upload_rate","#{rtorrent_new_up*RTORRENT_CONVERSION}")
-    end
-    #if request.length > 0 then
-    #    rtorrent.multicall(request)
-    #end
 end
 
