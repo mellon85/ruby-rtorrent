@@ -18,9 +18,9 @@ LINE_DOWN_MAX       = 250
 MIN_UP              = 5
 MIN_DOWN            = 10
 
-MAX_CHANGE_UP       = 5
+MAX_CHANGE_UP       = 2
 MAX_CHANGE_DOWN     = 10
-INTERVAL            = 1
+INTERVAL            = 2
 PROBE_INTERVAL      = 5
 RTORRENT_INTERVAL   = 2
 
@@ -29,8 +29,8 @@ RTORRENT_CONVERSION = 1024
 RTORRENT_COEFFICENT = 0.9
 DOWNLOAD_UPLOAD_RATIO = 1 # need testing to find a 'correct' value
 
-CRIT_UP             = 10
-CRIT_DOWN           = 30
+CRIT_UP             = 11
+CRIT_DOWN           = 50
 
 DEBUG = 1
 def debug(x)
@@ -104,6 +104,7 @@ rtorrent        = SCGIXMLClient.new([RTORRENT_SOCKET,"/RPC2"])
 rtorrent_up_a   = [0]*PROBE_INTERVAL
 rtorrent_down_a = [0]*PROBE_INTERVAL
 
+skip = 5
 while true do
     sleep(RTORRENT_INTERVAL)
 
@@ -118,6 +119,12 @@ while true do
     router_up   = $d.get_upload   / 1024
     router_down = $d.get_download / 1024
 
+    if skip > 0 then
+        debug "Skip: #{skip}"
+        skip -= 1
+        redo
+    end
+
     debug "Router up: #{router_up}"
     debug "Router down: #{router_down}"
 
@@ -125,8 +132,6 @@ while true do
     # VARIABLES:
     # router_up, router_down (avg over 5s)
     # rtorrent_max_up, rtorrent_max_down
-    # rtorrent_up,rtorrent_down (avg over 5s)
-    # other_up, other_down (avg over 5s)
     # store result in rtorrent_new_down, rtorrent_new_up
     
     rtorrent_new_up   = MAX_UP   - router_up   + rtorrent_max_up   - CRIT_UP
@@ -138,7 +143,24 @@ while true do
     rtorrent_new_up   = rtorrent_new_up.to_i
     rtorrent_new_down = rtorrent_new_down.to_i
 
+    # limit changes speeds
+    if (rtorrent_new_up-rtorrent_max_up).abs > MAX_CHANGE_UP then
+        if rtorrent_new_up > rtorrent_max_up then
+            rtorrent_new_up = rtorrent_max_up + MAX_CHANGE_UP
+        else
+            rtorrent_new_up = rtorrent_max_up - MAX_CHANGE_UP
+        end
+    end
+    if (rtorrent_new_down-rtorrent_max_down).abs > MAX_CHANGE_DOWN then
+        if rtorrent_new_down > rtorrent_max_down then
+            rtorrent_new_down = rtorrent_max_down + MAX_CHANGE_DOWN
+        else
+            rtorrent_new_down = rtorrent_max_down - MAX_CHANGE_DOWN
+        end
+    end
+
     # apply the limits
+    #
     if rtorrent_new_down < MIN_DOWN and MIN_DOWN != 0
         rtorrent_new_down = MIN_DOWN
     elsif rtorrent_new_down > MAX_DOWN and MAX_DOWN != 0
