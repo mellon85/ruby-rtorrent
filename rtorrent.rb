@@ -199,23 +199,15 @@ while true do
         rtorrent_new_up = MAX_UP
     end
 
-    #@TODO should use multicall but i am experiencing problems
-    # if needed apply the changes
-    #request = []
     begin
         if rtorrent_new_down != rtorrent_max_down
-            #request += ["set_download_rate","#{rtorrent_new_down*RTORRENT_CONVERSION}"]
             debug "fixing download to: #{rtorrent_new_down}"
             rtorrent.call("set_download_rate","#{rtorrent_new_down*RTORRENT_CONVERSION}")
         end
         if rtorrent_new_up != rtorrent_max_up
-            #request += ["set_upload_rate","#{rtorrent_new_up*RTORRENT_CONVERSION}"]
             debug "fixing upload to: #{rtorrent_new_up}"
             rtorrent.call("set_upload_rate","#{rtorrent_new_up*RTORRENT_CONVERSION}")
         end
-        #if request.length > 0 then
-        #    rtorrent.multicall(request)
-        #end
     rescue Exception => e
         puts "Error while sending new limits to rtorrent"
         pp e
