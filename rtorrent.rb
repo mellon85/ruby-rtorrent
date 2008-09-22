@@ -9,30 +9,51 @@ require 'thread'
 require 'SCGIxml'
 require 'pp'
 
+# if set to false the program wan't trust the router reported speed. This is
+# usefull if you are not connected with a DSL connection but for instance
+# trough pppoe or other kind of connection that can't tell you the maximum
+# available bandwidth.
+# If set to false you must fix LINE_UP_MAX and LINE_DOWN_MAX to the maximum
+# theorical values of your line because these represents raw KByte/s you ocan
+# send down the line, including any kind of nework overhead.
 TRUST_ROUTER_LINK_SPEED = true
-RTORRENT_SOCKET = "/home/dario/.rtorrent/socket"
+LINE_UP_MAX         = 42
+LINE_DOWN_MAX       = 300
 
-LINE_UP_MAX         = 25
-LINE_DOWN_MAX       = 250
+# Where rtorrent socket is configured to be. I usually place it in my own home directory in rtorrent session directory
+# you can change the location of the torrent in the .rtorrent.rc file with
+# scgi_local = <aboslute path>
+RTORRENT_SOCKET = "/home/user/.rtorrent/socket"
 
+# Minimum values you will accept for a running rtorrent
 MIN_UP              = 5
 MIN_DOWN            = 10
 
+# Change the speed at which the rates will vary
 MAX_CHANGE_UP       = 2
 MAX_CHANGE_DOWN     = 10
-INTERVAL            = 2
+
+# These values just tells how much time upnp polls must be kept
+# and how much time to sleep beetween 2 network
 PROBE_INTERVAL      = 5
 RTORRENT_INTERVAL   = 2
 
+# These are conversion factors to onvert data reported from the router to KByte and from rtorrent to KByte
 UPNP_CONVERSION     = 1024*8
 RTORRENT_CONVERSION = 1024
 RTORRENT_COEFFICENT = 0.9
-DOWNLOAD_UPLOAD_RATIO = 1 # need testing to find a 'correct' value
 
-CRIT_UP             = 11
+# These are the values everybody must care about. rtorrent will try to leave
+# always CRIT_UP KByte/s in upload free and CRIT_DOWN KByte/s in download free.
+# And for free I mean always free. Do not increase upload too much, or you
+# won't never get enough upload in ack packets to give more upload bandwidth to
+# your downloads. These are just some values i am testing for my 384k/2M adsl
+# line.
+CRIT_UP             = 11 
 CRIT_DOWN           = 50
 
-DEBUG = 1
+# Set debug to 1 to get a lot of info
+DEBUG = 0
 def debug(x)
     puts x if DEBUG == 1
 end
@@ -177,12 +198,6 @@ while true do
     elsif rtorrent_new_up > MAX_UP and MAX_UP != 0
         rtorrent_new_up = MAX_UP
     end
-
-#    # keep upload low enough to allow downloads
-#    download_ratio = router_down*DOWNLOAD_UPLOAD_RATIO
-#    if rtorrent_new_up > download_ratio then
-#        rtorrent_new_up = download_ratio
-#    end
 
     #@TODO should use multicall but i am experiencing problems
     # if needed apply the changes
