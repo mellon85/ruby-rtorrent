@@ -1,3 +1,4 @@
+#! /usr/bin/ruby
 require 'rubygems'
 
 begin
@@ -23,11 +24,11 @@ LINE_DOWN_MAX       = 300
 # Where rtorrent socket is configured to be. I usually place it in my own home directory in rtorrent session directory
 # you can change the location of the torrent in the .rtorrent.rc file with
 # scgi_local = <aboslute path>
-RTORRENT_SOCKET = "/home/user/.rtorrent/socket"
+RTORRENT_SOCKET = "/home/dario/.rtorrent/socket"
 
 # Minimum values you will accept for a running rtorrent
-MIN_UP              = 5
-MIN_DOWN            = 10
+MIN_UP              = 1
+MIN_DOWN            = 1
 
 # Change the speed at which the rates will vary
 MAX_CHANGE_UP       = 2
@@ -73,17 +74,24 @@ class UPnPDaemon
         @upload    = [0]*PROBE_INTERVAL
         @download  = [0]*PROBE_INTERVAL
         @semaphore = Mutex.new
-
         @upnp = UPnP::UPnP.new
         @daemon = Thread.new do 
             while true do
-              sent = @upnp.totalBytesSent().to_i
-              recv = @upnp.totalBytesReceived().to_i
-              @semaphore.synchronize {
-                @upload = @upload[1,PROBE_INTERVAL]+[sent]
-                @download = @download[1,PROBE_INTERVAL]+[recv]
-              }
-             sleep(1)
+                begin
+                    @upnp = UPnP::UPnP.new if @upnp == nil
+                    sent = @upnp.totalBytesSent().to_i
+                    recv = @upnp.totalBytesReceived().to_i
+                    @semaphore.synchronize {
+                        @upload = @upload[1,PROBE_INTERVAL]+[sent]
+                        @download = @download[1,PROBE_INTERVAL]+[recv]
+                    }
+                    sleep(1)
+                rescue Exception => e
+                    pp e
+                    puts "Maybe some problem with the router. Suspend upnp for 1 minute."
+                    sleep(60)
+                    @upnp = nil
+                end
             end
         end
     end
@@ -128,10 +136,13 @@ rtorrent_down_a = [0]*PROBE_INTERVAL
 skip = 5
 while true do
     sleep(RTORRENT_INTERVAL)
+    rtorrent_max_down = 0
+    rtorrent_max_up = 0
+    list = []
 
     # query rtorrent for data
     begin
-    rtorrent_max_down, rtorrent_max_up, list = rtorrent.multicall(["get_download_rate"],["get_upload_rate"],["download_list"]) 
+        rtorrent_max_down, rtorrent_max_up, list = rtorrent.multicall(["get_download_rate"],["get_upload_rate"],["download_list"]) 
     rescue Exception => e
         puts "Error while retriving data from rtorrent"
         pp e
