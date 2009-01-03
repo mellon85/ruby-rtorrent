@@ -10,21 +10,28 @@ require 'thread'
 require 'SCGIxml'
 require 'pp'
 
-# if set to false the program wan't trust the router reported speed. This is
-# usefull if you are not connected with a DSL connection but for instance
-# trough pppoe or other kind of connection that can't tell you the maximum
-# available bandwidth.
-# If set to false you must fix LINE_UP_MAX and LINE_DOWN_MAX to the maximum
-# theorical values of your line because these represents raw KByte/s you ocan
-# send down the line, including any kind of nework overhead.
-TRUST_ROUTER_LINK_SPEED = true
-LINE_UP_MAX         = 42
-LINE_DOWN_MAX       = 300
+# Set debug to 2 to get a lot of info (every bandwidth change and router
+# info). Set debug to 1 to get just the minimal information you need.
+DEBUG = 0
+DEBUG_LOGFILE="~/.rtorrent/controller.log"
 
-# Where rtorrent socket is configured to be. I usually place it in my own home directory in rtorrent session directory
-# you can change the location of the torrent in the .rtorrent.rc file with
-# scgi_local = <aboslute path>
-RTORRENT_SOCKET = "/home/dario/.rtorrent/socket"
+# if set to false the program wan't trust the router reported speed.
+# This is usefull if you are not connected with a DSL connection but for
+# instance trough pppoe or other kind of connection that can't tell you
+# the maximum available bandwidth.  If set to false you must fix
+# LINE_UP_MAX and LINE_DOWN_MAX to the maximum theorical values of your
+# line because these represents raw KByte/s you ocan send down the line,
+# including any kind of nework overhead.
+TRUST_ROUTER_LINK_SPEED = true
+LINE_UP_MAX         = 0 # set these to the right values
+LINE_DOWN_MAX       = 0 # 
+# My modem reports 2464/352 kbps, so i used 308/44
+
+# Where rtorrent socket is configured to be. I usually place it in my
+# own home directory in rtorrent session directory you can change the
+# location of the torrent in the .rtorrent.rc file with scgi_local =
+# <absolute path>
+RTORRENT_SOCKET = "~/.rtorrent/socket"
 
 # Minimum values you will accept for a running rtorrent
 MIN_UP              = 1
@@ -39,26 +46,37 @@ MAX_CHANGE_DOWN     = 10
 PROBE_INTERVAL      = 5
 RTORRENT_INTERVAL   = 2
 
-# These are conversion factors to onvert data reported from the router to KByte and from rtorrent to KByte
+# These are conversion factors to onvert data reported from the router
+# to KByte and from rtorrent to KByte
 UPNP_CONVERSION     = 1024*8
 RTORRENT_CONVERSION = 1024
 RTORRENT_COEFFICENT = 0.9
 
-# These are the values everybody must care about. rtorrent will try to leave
-# always CRIT_UP KByte/s in upload free and CRIT_DOWN KByte/s in download free.
-# And for free I mean always free. Do not increase upload too much, or you
-# won't never get enough upload in ack packets to give more upload bandwidth to
-# your downloads. These are just some values i am testing for my 384k/2M adsl
-# line.
-CRIT_UP             = 11 
-CRIT_DOWN           = 50
-
-# Set debug to 1 to get a lot of info
-DEBUG = 0
-def debug(x)
-    puts x if DEBUG == 1
+def log(x)
+    f = nil
+    begin
+        f = File.open("~/.rtorrent/controller.log", "a")
+        f.puts(Time.now.to_s + x)
+        f.close
+    rescue Exception => e
+        f.close if f != nil
+        puts "Error while logging!"
+        pp e
+    end
 end
 
+def debug(x)
+    if DEBUG >= 1 then
+        log(x)
+    end
+end
+
+def debug2(x)
+    if DEBUG >= 2 then
+        log(x)
+    end
+end
+        
 def get_average(v)
     a=0
     for i in 0..(v.length-2)
@@ -113,8 +131,6 @@ class UPnPDaemon
     def linkBitrate()
         @upnp.maxLinkBitrates()
     end
-
-    private
 end
 
 $d = UPnPDaemon.new
@@ -127,6 +143,16 @@ else
     MAX_UP   = LINE_UP_MAX
     MAX_DOWN = LINE_DOWN_MAX
 end
+
+# These are the values everybody must care about. rtorrent will try to leave
+# always CRIT_UP KByte/s in upload free and CRIT_DOWN KByte/s in download free.
+# And for free I mean always free. Do not increase upload too much, or you
+# won't never get enough upload in ack packets to give more upload bandwidth to
+# your downloads. These are just some values i am testing for my 384k/2M adsl
+# line.
+CRIT_UP             = 0.28571428571428571429 * MAX_UP
+CRIT_DOWN           = 0.16233766233766233767 * MAX_DOWN
+
 debug "MAX_UP = #{MAX_UP}"
 debug "MAX_DOWN = #{MAX_DOWN}"
 rtorrent        = SCGIXMLClient.new([RTORRENT_SOCKET,"/RPC2"])
@@ -142,7 +168,7 @@ while true do
 
     # query rtorrent for data
     begin
-        rtorrent_max_down, rtorrent_max_up, list = rtorrent.multicall(["get_download_rate"],["get_upload_rate"],["download_list"]) 
+        rtorrent_max_down, rtorrent_max_up, list = rtorrent.multicall(["get_download_rate"],["get_upload_rate"],["download_list"])
     rescue Exception => e
         puts "Error while retriving data from rtorrent"
         pp e
@@ -150,8 +176,8 @@ while true do
     end
 
     # get kB
-    rtorrent_max_down /= RTORRENT_CONVERSION
-    rtorrent_max_up   /= RTORRENT_CONVERSION
+    rtorrent_max_down = rtorrent_max_down / RTORRENT_CONVERSION
+    rtorrent_max_up   = rtorrent_max_up   / RTORRENT_CONVERSION
     
     # get info from the router about used bandwidth
     router_up   = $d.get_upload   / 1024
@@ -163,8 +189,8 @@ while true do
         redo
     end
 
-    debug "Router up: #{router_up}"
-    debug "Router down: #{router_down}"
+    debug2 "Router up: #{router_up}"
+    debug2 "Router down: #{router_down}"
 
     ### ALGORITHM
     # VARIABLES:
@@ -175,8 +201,8 @@ while true do
     rtorrent_new_up   = MAX_UP   - router_up   + rtorrent_max_up   - CRIT_UP
     rtorrent_new_down = MAX_DOWN - router_down + rtorrent_max_down - CRIT_DOWN
 
-    debug "#{rtorrent_new_up} = #{MAX_UP} - #{router_up} + #{rtorrent_max_up} - #{CRIT_UP}"
-    debug "#{rtorrent_new_down} = #{MAX_DOWN} - #{router_down} + #{rtorrent_max_down} - #{CRIT_DOWN}"
+    debug2 "new_up #{rtorrent_new_up} = #{MAX_UP} - #{router_up} + #{rtorrent_max_up} - #{CRIT_UP}"
+    debug2 "new_dw #{rtorrent_new_down} = #{MAX_DOWN} - #{router_down} + #{rtorrent_max_down} - #{CRIT_DOWN}"
 
     rtorrent_new_up   = rtorrent_new_up.to_i
     rtorrent_new_down = rtorrent_new_down.to_i
@@ -212,14 +238,15 @@ while true do
 
     begin
         if rtorrent_new_down != rtorrent_max_down
-            debug "fixing download to: #{rtorrent_new_down}"
+            debug2 "fixing download to: #{rtorrent_new_down}"
             rtorrent.call("set_download_rate","#{rtorrent_new_down*RTORRENT_CONVERSION}")
         end
         if rtorrent_new_up != rtorrent_max_up
-            debug "fixing upload to: #{rtorrent_new_up}"
+            debug2 "fixing upload to: #{rtorrent_new_up}"
             rtorrent.call("set_upload_rate","#{rtorrent_new_up*RTORRENT_CONVERSION}")
         end
     rescue Exception => e
+        debug "Error while sending new limits to rtorrent"
         puts "Error while sending new limits to rtorrent"
         pp e
         exit 2
