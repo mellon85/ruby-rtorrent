@@ -145,13 +145,20 @@ else
 end
 
 # These are the values everybody must care about. rtorrent will try to leave
-# always CRIT_UP KByte/s in upload free and CRIT_DOWN KByte/s in download free.
-# And for free I mean always free. Do not increase upload too much, or you
-# won't never get enough upload in ack packets to give more upload bandwidth to
-# your downloads. These are just some values i am testing for my 384k/2M adsl
-# line.
+# always CRIT_UP KByte/s in upload free and CRIT_DOWN KByte/s in
+# download free.  And for free I mean always free. Do not increase
+# upload too much, or you won't never get enough upload in ack packets
+# to give more upload bandwidth to your downloads. These are just some
+# values i am testing for my 384k/2M adsl line.
 CRIT_UP             = 0.28571428571428571429 * MAX_UP
 CRIT_DOWN           = 0.16233766233766233767 * MAX_DOWN
+
+# This value is multiplied for the current download bandwidth and is
+# subtracted to the upload bandwidth. The default is 0.01 (1% of
+# download bandwidth). So if you are downloading at 200KB/s then the
+# upload speed will be reduced by 2KB/s to allow for even faster
+# transferts.
+DOWNLOAD_COEFFICENT = 0.01
 
 debug "MAX_UP = #{MAX_UP}"
 debug "MAX_DOWN = #{MAX_DOWN}"
@@ -198,10 +205,10 @@ while true do
     # rtorrent_max_up, rtorrent_max_down
     # store result in rtorrent_new_down, rtorrent_new_up
     
-    rtorrent_new_up   = MAX_UP   - router_up   + rtorrent_max_up   - CRIT_UP
+    rtorrent_new_up   = MAX_UP   - router_up   + rtorrent_max_up   - CRIT_UP  - router_down * DOWNLOAD_COEFFICENT
     rtorrent_new_down = MAX_DOWN - router_down + rtorrent_max_down - CRIT_DOWN
 
-    debug2 "new_up #{rtorrent_new_up} = #{MAX_UP} - #{router_up} + #{rtorrent_max_up} - #{CRIT_UP}"
+    debug2 "new_up #{rtorrent_new_up} = #{MAX_UP} - #{router_up} + #{rtorrent_max_up} - #{CRIT_UP}  - #{router_down} * #{DOWNLOAD_COEFFICENT}"
     debug2 "new_dw #{rtorrent_new_down} = #{MAX_DOWN} - #{router_down} + #{rtorrent_max_down} - #{CRIT_DOWN}"
 
     rtorrent_new_up   = rtorrent_new_up.to_i
