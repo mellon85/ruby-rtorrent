@@ -52,7 +52,7 @@ UPNP_CONVERSION     = 1024*8
 RTORRENT_CONVERSION = 1024
 RTORRENT_COEFFICENT = 0.9
 
-DEBUG_FILE=File.open("~/.rtorrent/controller.log", "a")
+DEBUG_FILE=File.open(DEBUG_LOGFILE, "a")
 def log(x)
     DEBUG_FILE.puts(Time.now.to_s+"\t" + x)
     DEBUG_FILE.flush
