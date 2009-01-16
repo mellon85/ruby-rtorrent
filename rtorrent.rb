@@ -52,17 +52,10 @@ UPNP_CONVERSION     = 1024*8
 RTORRENT_CONVERSION = 1024
 RTORRENT_COEFFICENT = 0.9
 
+DEBUG_FILE=File.open("~/.rtorrent/controller.log", "a")
 def log(x)
-    f = nil
-    begin
-        f = File.open("~/.rtorrent/controller.log", "a")
-        f.puts(Time.now.to_s + x)
-        f.close
-    rescue Exception => e
-        f.close if f != nil
-        puts "Error while logging!"
-        pp e
-    end
+    DEBUG_FILE.puts(Time.now.to_s+"\t" + x)
+    DEBUG_FILE.flush
 end
 
 def debug(x)
@@ -150,8 +143,8 @@ end
 # upload too much, or you won't never get enough upload in ack packets
 # to give more upload bandwidth to your downloads. These are just some
 # values i am testing for my 384k/2M adsl line.
-CRIT_UP             = 0.28571428571428571429 * MAX_UP
-CRIT_DOWN           = 0.16233766233766233767 * MAX_DOWN
+CRIT_UP             = 0.3  * MAX_UP
+CRIT_DOWN           = 0.16 * MAX_DOWN
 
 # This value is multiplied for the current download bandwidth and is
 # subtracted to the upload bandwidth. The default is 0.01 (1% of
